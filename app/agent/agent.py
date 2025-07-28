@@ -7,6 +7,8 @@ from rich.prompt import Prompt
 from rich.markdown import Markdown
 from rich.table import Table
 import time
+import os
+from langchain_core.messages import AIMessage, ToolMessage
 
 
 class Agent:
@@ -19,46 +21,77 @@ class Agent:
             model_name=model_name, api_key=api_key, system_prompt=system_prompt
         )
         self.console = Console()
-        
+
     def _print_welcome(self):
         """Print a beautiful welcome screen"""
         # Create gradient ASCII art
         ascii_text = Text(ASCII_ART)
         ascii_text.stylize("bold magenta", 0, len(ASCII_ART))
-        
+
         self.console.print()
         self.console.print(ascii_text)
         self.console.print()
-        
+
         # Instructions
         self.console.print("[bold yellow]📋 Instructions[/bold yellow]")
         self.console.print("━" * 50, style="yellow")
-        self.console.print("💬  Type your message and press Enter to chat", style="white")
-        self.console.print("🚪  Type 'quit', 'exit', or 'q' to end the conversation", style="white")
-        self.console.print("🧹  Type 'clear' to clear conversation history", style="white")
-        self.console.print("🖥️  Type 'cls', 'clearterm', or 'clearscreen' to clear terminal", style="white")
-        self.console.print(f"🎯  Current model: [bold green]{self.model_name}[/bold green]", style="white")
+        self.console.print(
+            "💬  Type your message and press Enter to chat", style="white"
+        )
+        self.console.print(
+            "🚪  Type 'quit', 'exit', or 'q' to end the conversation", style="white"
+        )
+        self.console.print(
+            "🧹  Type 'clear' to clear conversation history", style="white"
+        )
+        self.console.print(
+            "🖥️  Type 'cls', 'clearterm', or 'clearscreen' to clear terminal",
+            style="white",
+        )
+        self.console.print(
+            f"🎯  Current model: [bold green]{self.model_name}[/bold green]",
+            style="white",
+        )
         self.console.print("━" * 50, style="yellow")
         self.console.print()
 
     def _print_tool_call(self, tool_name, args):
         """Print tool call information in a beautiful format"""
         self.console.print()
-        self.console.print(f"⚡ [bold yellow]Tool Called:[/bold yellow] [bold green]{tool_name}[/bold green]")
+        self.console.print(
+            f"⚡ [bold yellow]Tool Called:[/bold yellow] [bold green]{tool_name}[/bold green]"
+        )
         self.console.print("━" * 60, style="green")
-        
+
         tool_table = Table(show_header=True, header_style="bold magenta", box=None)
         tool_table.add_column("Parameter", style="cyan", width=20)
         tool_table.add_column("Value", style="white")
-        
+
         for k, v in args.items():
             value_str = str(v)
             if len(value_str) > 100:
                 value_str = value_str[:97] + "..."
             tool_table.add_row(k, value_str)
-        
+
         self.console.print(tool_table)
         self.console.print("━" * 60, style="green")
+        self.console.print()
+
+    def _print_tool_output(self, tool_message):
+        """Print tool execution output in a beautiful format"""
+        self.console.print()
+        self.console.print(
+            f"📤 [bold cyan]Tool Output:[/bold cyan] [bold green]{tool_message.name}[/bold green]"
+        )
+        self.console.print("━" * 60, style="cyan")
+        
+        # Clean up the output content
+        output_content = tool_message.content.strip()
+        if output_content.startswith("Output:\n"):
+            output_content = output_content[8:]  # Remove "Output:\n" prefix
+        
+        self.console.print(output_content, style="white")
+        self.console.print("━" * 60, style="cyan")
         self.console.print()
 
     def _print_user_message(self, message):
@@ -80,7 +113,7 @@ class Agent:
                 ai_content = content
         else:
             ai_content = content
-            
+
         self.console.print()
         self.console.print("🤖 [bold green]AI Assistant[/bold green]")
         self.console.print("─" * 50, style="green")
@@ -93,14 +126,14 @@ class Agent:
         with self.console.status("[bold green]🧠 AI is thinking...", spinner="dots"):
             time.sleep(0.5)  # Brief pause for effect
 
-    def start_chat(self, message: str | None = None):
+    def start_chat(self):
         """
         Start an isolated chat session with the code generation agent.
         During this session, you do not have access to the other agents.
         Arguments:
             message (str | None): Optional message for single-query sessions.
         """
-        
+
         self._print_welcome()
 
         configuration = {
@@ -108,57 +141,39 @@ class Agent:
             "recursion_limit": 100,
         }
 
-        if message:
-            self._print_user_message(message)
-            self._simulate_thinking()
-
-            response = self.agent.invoke({"messages": message}, configuration)
-            
-            # Process tool calls
-            for msg in response["messages"]:
-                try:
-                    if hasattr(msg, 'tool_calls') and msg.tool_calls:
-                        tool_call = msg.tool_calls[0]
-                        self._print_tool_call(tool_call['name'], tool_call["args"])
-                except Exception:
-                    pass
-                    
-            self._print_ai_response(response["messages"][-1].content)
-            return
-
         while True:
             try:
-                # Get user input with rich prompt
                 user_input = Prompt.ask(
-                    "\n[bold blue]You[/bold blue]",
-                    console=self.console
+                    "\n[bold blue]You[/bold blue]", console=self.console
                 ).strip()
 
                 if user_input.lower() in ["quit", "exit", "q"]:
                     self.console.print()
                     self.console.print("🚪 [yellow]Goodbye![/yellow]")
                     self.console.print("─" * 30, style="bright_blue")
-                    self.console.print("[bold cyan]Thanks for using the AI Assistant! 👋[/bold cyan]")
+                    self.console.print(
+                        "[bold cyan]Thanks for using the AI Assistant! 👋[/bold cyan]"
+                    )
                     self.console.print("─" * 30, style="bright_blue")
                     self.console.print()
                     break
 
                 if user_input.lower() == "clear":
-                    # Create a new session
+                    # new session
                     configuration["configurable"]["thread_id"] = str(uuid.uuid4())
-                    
+
                     self.console.print()
                     self.console.print("🧹 [yellow]History Cleared[/yellow]")
                     self.console.print("─" * 30, style="green")
-                    self.console.print("[bold green]✨ Conversation history has been cleared![/bold green]")
+                    self.console.print(
+                        "[bold green]✨ Conversation history has been cleared![/bold green]"
+                    )
                     self.console.print("─" * 30, style="green")
                     self.console.print()
                     continue
 
                 if user_input.lower() in ["cls", "clearterm", "clearscreen"]:
-                    # Clear the terminal screen (Linux style)
-                    import os
-                    os.system('clear')
+                    os.system("clear")
                     continue
 
                 if not user_input:
@@ -166,18 +181,34 @@ class Agent:
 
                 self._simulate_thinking()
 
-                response = self.agent.invoke({"messages": user_input}, configuration)
-                
-                # Process tool calls
-                for msg in response["messages"]:
-                    try:
-                        if hasattr(msg, 'tool_calls') and msg.tool_calls:
-                            tool_call = msg.tool_calls[0]
-                            self._print_tool_call(tool_call['name'], tool_call["args"])
-                    except Exception:
-                        pass
+                for chunk in self.agent.stream({"messages": user_input}, configuration):
+                    
+                    # Handle agent chunks (AI messages)
+                    if "agent" in chunk:
+                        agent_data = chunk["agent"]
+                        if "messages" in agent_data:
+                            messages = agent_data["messages"]
+                            if messages and isinstance(messages[0], AIMessage):
+                                ai_message = messages[0]
+                                
+                                # Print tool calls if present
+                                if ai_message.tool_calls:
+                                    for tool_call in ai_message.tool_calls:
+                                        self._print_tool_call(
+                                            tool_call["name"], tool_call["args"]
+                                        )
+                                
+                                # Print AI response content (even if empty)
+                                if ai_message.content and ai_message.content.strip():
+                                    self._print_ai_response(ai_message.content)
+                    
+                    # Handle tools chunks (tool execution results)
+                    elif "tools" in chunk:
+                        tools_data = chunk["tools"]
+                        if "messages" in tools_data:
+                            for tool_message in tools_data["messages"]:
+                                self._print_tool_output(tool_message)
 
-                self._print_ai_response(response["messages"][-1].content)
 
             except KeyboardInterrupt:
                 self.console.print()
@@ -185,11 +216,13 @@ class Agent:
                 self.console.print("─" * 30, style="red")
                 self.console.print("[bold red]Interrupted by user 🛑[/bold red]")
                 self.console.print("─" * 30, style="red")
-                
+
                 self.console.print()
                 self.console.print("🚪 [yellow]Goodbye![/yellow]")
                 self.console.print("─" * 30, style="bright_blue")
-                self.console.print("[bold cyan]Thanks for using the AI Assistant! 👋[/bold cyan]")
+                self.console.print(
+                    "[bold cyan]Thanks for using the AI Assistant! 👋[/bold cyan]"
+                )
                 self.console.print("─" * 30, style="bright_blue")
                 self.console.print()
                 break
@@ -201,3 +234,6 @@ class Agent:
                 self.console.print("[dim]Please try again...[/dim]")
                 self.console.print("─" * 40, style="red")
                 self.console.print()
+                import traceback
+
+                traceback.print_exc(file=self.console.file)

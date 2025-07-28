@@ -21,3 +21,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
 COPY main.py ./
+COPY system_prompt.txt ./
