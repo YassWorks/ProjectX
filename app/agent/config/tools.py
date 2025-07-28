@@ -321,9 +321,9 @@ def read_file(file_path: str) -> str:
 
 
 @tool
-def list_directory(path: str = ".", max_depth: int = None) -> str:
+def list_directory(path: str = ".") -> str:
     """
-    **PRIMARY PURPOSE**: Shows all files and folders in a directory tree structure.
+    **PRIMARY PURPOSE**: Shows all files and folders in a professional ASCII tree structure.
 
     **WHEN TO USE**:
     - Exploring an unknown directory structure
@@ -334,33 +334,39 @@ def list_directory(path: str = ".", max_depth: int = None) -> str:
 
     **BEHAVIOR**:
     - Recursively explores all subdirectories
-    - Shows hierarchical structure with indentation
-    - Uses emojis to distinguish files (📄) from folders (📁)
-    - Can limit exploration depth to avoid overwhelming output
+    - Shows hierarchical structure with ASCII tree characters (├── └── │)
+    - Directories are marked with trailing "/" 
+    - Files and directories are sorted alphabetically within each level
+    - Displays absolute path as header
+
+    **OUTPUT FORMAT**:
+        /absolute/path/to/directory/
+        │
+        ├── file1.txt
+        ├── file2.py
+        ├── subdirectory/
+        │   ├── nested_file.md
+        │   └── another_file.json
+        └── last_file.txt
 
     **PARAMETERS**:
         path (str): Directory to explore. Defaults to current directory (".")
                    Examples: ".", "documents", "/home/user/projects"
-        max_depth (int): Maximum levels deep to explore. None = unlimited
-                        Examples: 1 (only immediate children), 3 (up to 3 levels)
 
     **RETURNS**:
-        str: Formatted tree view of all files and directories
+        str: Professional ASCII tree view of all files and directories
 
     **USEFUL FOR**: Getting bearings in unfamiliar directory structures
 
     **EXAMPLES**:
         list_directory(".")                      # Show current directory structure
-        list_directory("documents", max_depth=2) # Explore documents/ up to 2 levels deep
+        list_directory("documents")              # Explore documents/
         list_directory("/var/log")               # Show system log directory contents
     """
 
-    def _list_directory_recursive(current_path: str, current_depth: int = 0) -> list:
+    def _list_directory_recursive(current_path: str, current_depth: int = 0, is_last: bool = True, parent_prefix: str = "") -> list:
         """Helper function to recursively build directory tree"""
         items = []
-
-        if max_depth is not None and current_depth >= max_depth:
-            return items
 
         try:
             all_items = os.listdir(current_path)
@@ -374,28 +380,66 @@ def list_directory(path: str = ".", max_depth: int = None) -> str:
                 else:
                     files.append(item)
 
-            indent = "  " * current_depth
+            # Sort files and directories
+            all_sorted = sorted(files) + sorted(dirs)
+            total_items = len(all_sorted)
 
-            for file_name in sorted(files):
-                items.append(f"{indent}📄 {file_name}")
+            for i, item_name in enumerate(all_sorted):
+                is_last_item = (i == total_items - 1)
+                item_path = os.path.join(current_path, item_name)
+                
+                # Determine the prefix for this item
+                if current_depth == 0:
+                    prefix = ""
+                else:
+                    if is_last_item:
+                        prefix = parent_prefix + "└── "
+                    else:
+                        prefix = parent_prefix + "├── "
 
-            for dir_name in sorted(dirs):
-                items.append(f"{indent}📁 {dir_name}/")
-
-                subdir_path = os.path.join(current_path, dir_name)
-                sub_items = _list_directory_recursive(subdir_path, current_depth + 1)
-                items.extend(sub_items)
+                # Add the item
+                if os.path.isdir(item_path):
+                    items.append(f"{prefix}{item_name}/")
+                    
+                    # Recursively process subdirectory
+                    if current_depth == 0:
+                        new_parent_prefix = "│   "
+                    else:
+                        if is_last_item:
+                            new_parent_prefix = parent_prefix + "    "
+                        else:
+                            new_parent_prefix = parent_prefix + "│   "
+                    
+                    sub_items = _list_directory_recursive(item_path, current_depth + 1, is_last_item, new_parent_prefix)
+                    items.extend(sub_items)
+                    
+                    # Add empty line after directory contents if not the last item
+                    if not is_last_item and sub_items:
+                        items.append(parent_prefix + "│")
+                else:
+                    items.append(f"{prefix}{item_name}")
 
         except PermissionError:
-            items.append(f"{indent}❌ Permission denied")
+            if current_depth == 0:
+                items.append("❌ Permission denied")
+            else:
+                items.append(f"{parent_prefix}❌ Permission denied")
         except Exception as e:
-            items.append(f"{indent}❌ Error: {str(e)}")
+            if current_depth == 0:
+                items.append(f"❌ Error: {str(e)}")
+            else:
+                items.append(f"{parent_prefix}❌ Error: {str(e)}")
 
         return items
 
     try:
+        # Add header with path
+        result = [f"{os.path.abspath(path)}/", "│"]
+        
         items = _list_directory_recursive(path)
-        return "\n".join(items)
+        result.extend(items)
+        
+        return "\n".join(result)
     except Exception as e:
         return f"Error listing directory: {str(e)}"
 
