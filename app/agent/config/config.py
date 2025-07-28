@@ -2,6 +2,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langchain_cerebras import ChatCerebras
 from langgraph.prebuilt import create_react_agent
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.prebuilt import ToolNode
 from app.agent.config.tools import (
     create_wd,
     create_file,
@@ -48,11 +49,13 @@ def get_agent(
 
     mem = MemorySaver()
 
+    custom_tool_node = ToolNode(
+        tools,
+        handle_tool_errors="Tool call failed! Please try a different tool or input.",
+    )
+
     agent = create_react_agent(
-        model=llm,
-        tools=tools,
-        prompt=system_prompt,
-        checkpointer=mem,
+        model=llm, tools=custom_tool_node, prompt=system_prompt, checkpointer=mem
     )
 
     return agent
