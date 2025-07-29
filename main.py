@@ -6,7 +6,7 @@ from app import Agent
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
-MODEL_NAME = "qwen-3-235b-a22b"
+MODEL_NAME = "qwen-3-235b-a22b-instruct-2507"
 
 # system_prompt = textwrap.dedent(input().strip())
 
