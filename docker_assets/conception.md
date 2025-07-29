@@ -1,9 +1,9 @@
 # Snake Game – Project Conception
 
-## 🎯 Objective
+## Objective
 A classic Snake game that runs in a Pygame window. Snake moves on a 2D grid, eats food, grows, and dies on self/wall collision.
 
-## 🗂 Project Structure
+## Project Structure
 ```plaintext
 /projects/snake/
 │
@@ -21,7 +21,7 @@ A classic Snake game that runs in a Pygame window. Snake moves on a 2D grid, eat
 └── conception.md        # Project structure and design
 ```
 
-## 🧠 Module Summary
+## Module Summary
 
 ### `config.py`
 ```python
@@ -97,7 +97,7 @@ if __name__ == "__main__":
     ...
 ```
 
-## ✅ Expected Behavior
+## Expected Behavior
 - Arrow keys control the snake
 - Snake grows after eating
 - Game ends on collision

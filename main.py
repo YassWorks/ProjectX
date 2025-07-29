@@ -6,7 +6,7 @@ from app import Agent
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
-MODEL_NAME = "qwen-3-32b"
+MODEL_NAME = "qwen-3-235b-a22b"
 
 # system_prompt = textwrap.dedent(input().strip())
 
@@ -14,7 +14,7 @@ directory = os.path.dirname(os.path.abspath(__file__))
 system_prompt_path = os.path.join(directory, "system_prompt.txt")
 with open(system_prompt_path, "r") as file:
     system_prompt = file.read().strip()
-    
+
 # print(system_prompt)
 
 agent = Agent(

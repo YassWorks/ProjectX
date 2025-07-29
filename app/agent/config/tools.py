@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 import shlex
 import re
-import time
+# import time
 
 
 @tool
@@ -445,9 +445,9 @@ def list_directory(path: str = ".") -> str:
 
 
 @tool
-def execute_code(code: str, language: str = "python") -> str:
+def execute_code(code: str) -> str:
     """
-    **PRIMARY PURPOSE**: Safely executes code snippets in a controlled environment.
+    **PRIMARY PURPOSE**: Safely executes python code snippets in a controlled environment.
 
     **WHEN TO USE**:
     - Testing small code snippets or calculations
@@ -456,7 +456,7 @@ def execute_code(code: str, language: str = "python") -> str:
     - Executing safe computational tasks
 
     **SECURITY RESTRICTIONS**:
-    - TIMEOUT: Execution limited to 30 seconds maximum
+    - TIMEOUT: Execution limited to 300 seconds maximum
     - MEMORY: Basic memory usage monitoring
     - EXTREME CAUTION: Only blocks truly destructive operations
 
@@ -467,8 +467,7 @@ def execute_code(code: str, language: str = "python") -> str:
     - Prevents access to sensitive system resources
 
     **PARAMETERS**:
-        code (str): The code to execute. Must be safe and non-malicious
-        language (str): Programming language ("python", "bash"). Default: "python"
+        code (str): The code to execute. Must be valid python code that is safe and non-malicious
 
     **RETURNS**:
         str: Code output, error messages, or security violation warnings
@@ -481,11 +480,10 @@ def execute_code(code: str, language: str = "python") -> str:
     **SECURITY NOTE**: This tool actively blocks malicious operations!
     """
 
-    # Minimal security checks - only block truly dangerous operations
     dangerous_patterns = [
-        r"rm\s+-rf\s+/",  # Only block rm -rf on root
-        r"format\s+c:",  # Windows format command
-        r"mkfs\s+/dev/",  # Format filesystem
+        r"rm\s+-rf\s+/",
+        r"format\s+c:",
+        r"mkfs\s+/dev/",
     ]
 
     for pattern in dangerous_patterns:
@@ -493,40 +491,34 @@ def execute_code(code: str, language: str = "python") -> str:
             return f"🚫 BLOCKED: Extremely destructive operation: {pattern}"
 
     try:
-        if language.lower() == "python":
-            # Simple Python execution - allow most operations
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".py", delete=False
-            ) as tmp_file:
-                tmp_file.write(code)
-                tmp_file_path = tmp_file.name
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".py", delete=False
+        ) as tmp_file:
+            tmp_file.write(code)
+            tmp_file_path = tmp_file.name
 
-            # Execute with timeout
-            result = subprocess.run(
-                ["python", tmp_file_path],
-                capture_output=True,
-                text=True,
-                timeout=30,
-                cwd=os.getcwd(),
-            )
+        result = subprocess.run(
+            ["python", tmp_file_path],
+            capture_output=True,
+            text=True,
+            timeout=300,
+            cwd=os.getcwd(),
+        )
 
-            os.unlink(tmp_file_path)  # Clean up temp file
+        os.unlink(tmp_file_path) # cleanup
 
-            output = ""
-            if result.stdout:
-                output += f"Output:\n{result.stdout}"
-            if result.stderr:
-                output += f"\nErrors:\n{result.stderr}"
-            if result.returncode != 0:
-                output += f"\nReturn code: {result.returncode}"
+        output = ""
+        if result.stdout:
+            output += f"Output:\n{result.stdout}"
+        if result.stderr:
+            output += f"\nErrors:\n{result.stderr}"
+        if result.returncode != 0:
+            output += f"\nReturn code: {result.returncode}"
 
-            return output.strip() if output.strip() else "Code executed successfully"
-
-        else:
-            return f"❌ Unsupported language: {language}. Only 'python' is currently supported."
-
+        return output.strip() if output.strip() else "Code executed successfully"
+    
     except subprocess.TimeoutExpired:
-        return "⏰ Code execution timed out (30 second limit exceeded)"
+        return "⏰ Code execution timed out (300 second limit exceeded)"
     except Exception as e:
         return f"❌ Execution error: {str(e)}"
 
@@ -534,7 +526,7 @@ def execute_code(code: str, language: str = "python") -> str:
 @tool
 def execute_command(command: str) -> str:
     """
-    **PRIMARY PURPOSE**: Safely executes command-line commands in a controlled environment.
+    **PRIMARY PURPOSE**: Safely executes linux command-line commands in a controlled environment.
 
     **WHEN TO USE**:
     - Running safe system utilities (ls, cat, grep, find)
@@ -543,7 +535,7 @@ def execute_command(command: str) -> str:
     - Safe read-only operations
 
     **SECURITY RESTRICTIONS**:
-    - TIMEOUT: Commands limited to 60 seconds maximum
+    - TIMEOUT: Commands limited to 300 seconds maximum
     - EXTREME ONLY: Only blocks filesystem destruction and hardware access
     - VIRTUAL ENV: Since you're in a VM, most operations are allowed
 
@@ -573,23 +565,21 @@ def execute_command(command: str) -> str:
         execute_command("ls -la")
         execute_command("cat config.txt")
         execute_command("sudo apt update")
-        execute_command("pip install requests")
+        execute_command("pip3 install requests")
         execute_command("curl https://api.github.com")
         execute_command("find . -name '*.txt'")
 
     **CAUTION**: You're in a VM, but still be careful with destructive operations!
     """
 
-    # Minimal security checks - only block truly catastrophic operations
     extremely_dangerous_commands = [
-        r"^rm\s+-rf\s+/$",  # rm -rf / (root deletion)
-        r"^dd\s+.*of=/dev/sd[a-z]$",  # Direct disk writing
-        r"^mkfs\s+/dev/sd[a-z]$",  # Format disk
-        r"^fdisk\s+/dev/sd[a-z]$",  # Disk partitioning
-        r":\(\)\{.*\}",  # Fork bomb pattern
+        r"^rm\s+-rf\s+/$",
+        r"^dd\s+.*of=/dev/sd[a-z]$",
+        r"^mkfs\s+/dev/sd[a-z]$",
+        r"^fdisk\s+/dev/sd[a-z]$",
+        r":\(\)\{.*\}",
     ]
 
-    # Check for extremely dangerous patterns only
     for pattern in extremely_dangerous_commands:
         if re.search(pattern, command, re.IGNORECASE):
             return f"🚫 BLOCKED: Extremely destructive operation: {pattern}"
@@ -603,12 +593,11 @@ def execute_command(command: str) -> str:
         if not parsed_command:
             return "❌ Empty command"
 
-        # Execute command with timeout
         result = subprocess.run(
             command,
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=300,
             shell=True,
             cwd=os.getcwd(),
         )
@@ -637,27 +626,27 @@ def execute_command(command: str) -> str:
         return f"❌ Execution error: {str(e)}"
 
 
-@tool
-def stall(duration: float = 5):
-    """
-    **PRIMARY PURPOSE**: Pauses execution for a specified duration.
+# @tool
+# def stall(duration: float = 5):
+#     """
+#     **PRIMARY PURPOSE**: Pauses execution for a specified duration.
 
-    **WHEN TO USE**:
-    - Introducing delays in workflows
-    - Waiting on other agents to complete tasks
-    - Waiting for external processes to finish
-    - Waiting for external events or conditions
+#     **WHEN TO USE**:
+#     - Introducing delays in workflows
+#     - Waiting on other agents to complete tasks
+#     - Waiting for external processes to finish
+#     - Waiting for external events or conditions
 
-    **PARAMETERS**:
-        duration (float): Duration to stall in seconds
+#     **PARAMETERS**:
+#         duration (float): Duration to stall in seconds
 
-    **RETURNS**:
-        str: Confirmation message
+#     **RETURNS**:
+#         str: Confirmation message
 
-    **EXAMPLES**:
-        stall(2.5)
+#     **EXAMPLES**:
+#         stall(2.5)
         
-    Note: Be generous with the duration (5-10s is a good start). Other agents may need time to work.
-    """
-    time.sleep(duration)
-    return f"Stalled for {duration} seconds"
+#     Note: Be generous with the duration (5-10s is a good start). Other agents may need time to work.
+#     """
+#     time.sleep(duration)
+#     return f"Stalled for {duration} seconds"
