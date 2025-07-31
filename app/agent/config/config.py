@@ -4,7 +4,8 @@ from langchain_core.messages import ToolMessage
 from langgraph.graph.message import add_messages
 from langgraph.graph import StateGraph, END, START
 from typing import TypedDict, Annotated
-from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.prebuilt import ToolNode
+from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.prompts import ChatPromptTemplate
 from app.agent.config.tools import (
     create_wd,
@@ -84,7 +85,8 @@ def get_agent(
     )
     graph.add_edge("tools", "llm")
 
-    return graph.compile()
+    mem = MemorySaver()
+    return graph.compile(checkpointer=mem)
 
 
 def tool_call_attempted(state: State):
@@ -105,8 +107,6 @@ def tool_call_attempted(state: State):
         return "toolcall_checker"
     else:
         return END
-
-
 def valid_toolcall(state: State):
 
     if state["messages"] != []:
@@ -134,7 +134,5 @@ def valid_toolcall(state: State):
         return "llm"
     else:
         return "tools"
-
-
 def forward(state: State):
     return {}

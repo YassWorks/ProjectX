@@ -6,7 +6,7 @@ from app import Agent
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
-MODEL_NAME = "qwen-3-32b"
+MODEL_NAME = "llama-3.3-70b"
 
 # system_prompt = textwrap.dedent(input().strip())
 

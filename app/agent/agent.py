@@ -1,15 +1,13 @@
 from app.agent.config.config import get_agent
+from langchain_core.messages import AIMessage
 from app.utils.ascii_art import ASCII_ART
-import uuid
+from app.agent.ui import AgentUI
 from rich.console import Console
-from rich.text import Text
 from rich.prompt import Prompt
-from rich.markdown import Markdown
-from rich.table import Table
-import time
-import os
 import langgraph
-from langchain_core.messages import AIMessage, ToolMessage
+import uuid
+import os
+import openai
 
 
 class Agent:
@@ -22,124 +20,16 @@ class Agent:
             model_name=model_name, api_key=api_key, system_prompt=system_prompt
         )
         self.console = Console()
+        self.ui = AgentUI(self.console)
 
-    def _print_welcome(self):
-        """Print a beautiful welcome screen"""
-        # Create gradient ASCII art
-        ascii_text = Text(ASCII_ART)
-        ascii_text.stylize("bold magenta", 0, len(ASCII_ART))
+    def start_chat(self, recursion_limit: int = 100):
 
-        self.console.print()
-        self.console.print(ascii_text)
-        self.console.print()
-
-        # Instructions
-        self.console.print("[bold yellow]📋 Instructions[/bold yellow]")
-        self.console.print("━" * 50, style="yellow")
-        self.console.print(
-            "💬  Type your message and press Enter to chat", style="white"
-        )
-        self.console.print(
-            "🚪  Type 'quit', 'exit', or 'q' to end the conversation", style="white"
-        )
-        self.console.print(
-            "🧹  Type 'clear' to clear conversation history", style="white"
-        )
-        self.console.print(
-            "🖥️  Type 'cls', 'clearterm', or 'clearscreen' to clear terminal",
-            style="white",
-        )
-        self.console.print(
-            f"🎯  Current model: [bold green]{self.model_name}[/bold green]",
-            style="white",
-        )
-        self.console.print("━" * 50, style="yellow")
-        self.console.print()
-
-    def _print_tool_call(self, tool_name, args):
-        """Print tool call information in a beautiful format"""
-        self.console.print()
-        self.console.print(
-            f"⚡ [bold yellow]Tool Called:[/bold yellow] [bold green]{tool_name}[/bold green]"
-        )
-        self.console.print("━" * 60, style="green")
-
-        tool_table = Table(show_header=True, header_style="bold magenta", box=None)
-        tool_table.add_column("Parameter", style="cyan", width=20)
-        tool_table.add_column("Value", style="white")
-
-        for k, v in args.items():
-            value_str = str(v)
-            if len(value_str) > 100:
-                value_str = value_str[:97] + "..."
-            tool_table.add_row(k, value_str)
-
-        self.console.print(tool_table)
-        self.console.print("━" * 60, style="green")
-        self.console.print()
-
-    def _print_tool_output(self, tool_message):
-        """Print tool execution output in a beautiful format"""
-        self.console.print()
-        self.console.print(
-            f"📤 [bold cyan]Tool Output:[/bold cyan] [bold green]{tool_message.name}[/bold green]"
-        )
-        self.console.print("━" * 60, style="cyan")
-
-        # Clean up the output content
-        output_content = tool_message.content.strip()
-        if output_content.startswith("Output:\n"):
-            output_content = output_content[8:]  # Remove "Output:\n" prefix
-
-        self.console.print(output_content, style="white")
-        self.console.print("━" * 60, style="cyan")
-        self.console.print()
-
-    def _print_user_message(self, message):
-        """Print user message in a styled format"""
-        self.console.print()
-        self.console.print("👤 [bold blue]You[/bold blue]")
-        self.console.print("─" * 40, style="blue")
-        self.console.print(message, style="white")
-        self.console.print("─" * 40, style="blue")
-        self.console.print()
-
-    def _print_ai_response(self, content):
-        """Print AI response in a styled format"""
-        # Try to parse as markdown if it looks like it contains code or formatting
-        if "```" in content or "#" in content or "*" in content:
-            try:
-                ai_content = Markdown(content)
-            except:
-                ai_content = content
-        else:
-            ai_content = content
-
-        self.console.print()
-        self.console.print("🤖 [bold green]AI Assistant[/bold green]")
-        self.console.print("─" * 50, style="green")
-        self.console.print(ai_content)
-        self.console.print("─" * 50, style="green")
-        self.console.print()
-
-    def _simulate_thinking(self):
-        """Show a thinking animation"""
-        with self.console.status("[bold green]🧠 AI is thinking...", spinner="dots"):
-            time.sleep(2)  # Brief pause for effect
-
-    def start_chat(self):
-        """
-        Start an isolated chat session with the code generation agent.
-        During this session, you do not have access to the other agents.
-        Arguments:
-            message (str | None): Optional message for single-query sessions.
-        """
-
-        self._print_welcome()
+        self.ui.logo(ASCII_ART)
+        self.ui.help(self.model_name)
 
         configuration = {
             "configurable": {"thread_id": "abc123"},
-            "recursion_limit": 100,
+            "recursion_limit": recursion_limit,
         }
 
         while True:
@@ -148,43 +38,68 @@ class Agent:
                     "\n[bold blue]You[/bold blue]", console=self.console
                 ).strip()
 
-                if user_input.lower() in ["quit", "exit", "q"]:
-                    self.console.print()
-                    self.console.print("🚪 [yellow]Goodbye![/yellow]")
-                    self.console.print("─" * 30, style="bright_blue")
-                    self.console.print(
-                        "[bold cyan]Thanks for using the AI Assistant! 👋[/bold cyan]"
-                    )
-                    self.console.print("─" * 30, style="bright_blue")
-                    self.console.print()
+                if user_input.lower() in ["/quit", "/exit", "/q"]:
+                    self.ui.goodbye()
                     break
 
-                if user_input.lower() == "clear":
+                if user_input.lower() == "/clear":
                     # new session
                     configuration["configurable"]["thread_id"] = str(uuid.uuid4())
-
-                    self.console.print()
-                    self.console.print("🧹 [yellow]History Cleared[/yellow]")
-                    self.console.print("─" * 30, style="green")
-                    self.console.print(
-                        "[bold green]✨ Conversation history has been cleared![/bold green]"
-                    )
-                    self.console.print("─" * 30, style="green")
-                    self.console.print()
+                    self.ui.history_cleared()
                     continue
 
-                if user_input.lower() in ["cls", "clearterm", "clearscreen"]:
+                if user_input.lower() in ["/cls", "/clearterm", "/clearscreen"]:
                     os.system("clear")
+                    continue
+
+                if user_input.lower() in ["/help", "/h"]:
+                    self.ui.help(self.model_name)
+                    continue
+                
+                if len(user_input.lower()) > 0 and user_input.lower()[0] == "/":
+                    self.ui.error("Unknown command. Type /help for instructions.")
+                    continue
+
+                if user_input.lower() == "/model":
+                    self.ui.status_message(
+                        title="Current Model",
+                        message=self.model_name,
+                    )
                     continue
 
                 if not user_input:
                     continue
 
-                self.console.print()
-                self._simulate_thinking()
+                command_parts = user_input.lower().split()
+                
+                if command_parts[0] == "/model":
+                    if len(command_parts) > 1 and command_parts[1] == "change":
+                        if len(command_parts) > 2:
+                            new_model = command_parts[2]
+                            self.ui.status_message(
+                                title="Change Model",
+                                message=f"Changing model to {new_model}",
+                            )
+                            self.model_name = new_model
+                            self.agent = get_agent(
+                                model_name=self.model_name,
+                                api_key=self.api_key,
+                                system_prompt=self.system_prompt,
+                            )
+                            continue
+                        else:
+                            self.ui.error("Please specify a model to change to.")
+                            continue
+                    else:
+                        self.ui.error("Unknown command. Type /help for instructions.")
+                        continue
+
+                self.ui.simulate_thinking()
 
                 # start response streaming
-                for chunk in self.agent.stream({"messages": [("human", user_input)]}, configuration):
+                for chunk in self.agent.stream(
+                    {"messages": [("human", user_input)]}, configuration
+                ):
 
                     if "llm" in chunk:
                         llm_data = chunk["llm"]
@@ -195,51 +110,35 @@ class Agent:
 
                                 if ai_message.tool_calls:
                                     for tool_call in ai_message.tool_calls:
-                                        self._print_tool_call(
+                                        self.ui.tool_call(
                                             tool_call["name"], tool_call["args"]
                                         )
 
                                 if ai_message.content and ai_message.content.strip():
-                                    self._print_ai_response(ai_message.content)
+                                    self.ui.ai_response(ai_message.content)
 
                     elif "tools" in chunk:
                         tools_data = chunk["tools"]
                         if "messages" in tools_data:
                             for tool_message in tools_data["messages"]:
-                                self._print_tool_output(tool_message)
+                                self.ui.tool_output(
+                                    tool_message.name, tool_message.content
+                                )
 
             except KeyboardInterrupt:
-                self.console.print()
-                self.console.print("⚠️  [yellow]Session Interrupted[/yellow]")
-                self.console.print("─" * 30, style="red")
-                self.console.print("[bold red]Interrupted by user 🛑[/bold red]")
-                self.console.print("─" * 30, style="red")
-
-                self.console.print()
-                self.console.print("🚪 [yellow]Goodbye![/yellow]")
-                self.console.print("─" * 30, style="bright_blue")
-                self.console.print(
-                    "[bold cyan]Thanks for using the AI Assistant! 👋[/bold cyan]"
-                )
-                self.console.print("─" * 30, style="bright_blue")
-                self.console.print()
+                self.ui.session_interrupted()
+                self.ui.goodbye()
                 break
             except langgraph.errors.GraphRecursionError as e:
-                self.console.print()
-                self.console.print("─" * 40, style="bold blue")
-                self.console.print("📢  [bold blue]Agent has been going for a while[/bold blue]")
-                self.console.print("Would you like to continue or do you wish to refine your prompt instead? (y/n)", style="blue")
-                self.console.print("─" * 40, style="bold blue")
+                self.ui.recursion_warning()
                 ######## placeholder for continuing logic
+            except openai.RateLimitError:
+                self.ui.status_message(
+                    "⏳",
+                    title="Rate Limit Exceeded",
+                    message="Please try again later or switch to a different model.",
+                    style="red",
+                )
             except Exception as e:
-                self.console.print()
-                self.console.print("⚠️  [red]Error Occurred[/red]")
-                self.console.print("─" * 40, style="red")
-                self.console.print(f"[bold red]❌ Error: {str(e)}[/bold red]")
-                self.console.print("[dim]Please try again...[/dim]")
-                self.console.print("─" * 40, style="red")
-                self.console.print()
-
-                # dev (remove later)
-                import traceback
-                traceback.print_exc(file=self.console.file)
+                self.ui.error(str(e))
+                self.ui.dev_traceback()  # dev (remove later)
