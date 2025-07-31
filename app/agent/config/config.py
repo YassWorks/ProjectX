@@ -77,7 +77,7 @@ def get_agent(
 
     graph.add_edge(START, "llm")
     graph.add_conditional_edges(
-        "llm", tool_call_attempted, {"toolcall_checker": "toolcall_checker", END: "__end__"}
+        "llm", tool_call_attempted, {"toolcall_checker": "toolcall_checker", END: END}
     )
     graph.add_conditional_edges(
         "toolcall_checker", valid_toolcall, {"tools": "tools", "llm": "llm"}

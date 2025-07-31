@@ -8,6 +8,7 @@ from rich.markdown import Markdown
 from rich.table import Table
 import time
 import os
+import langgraph
 from langchain_core.messages import AIMessage, ToolMessage
 
 
@@ -223,6 +224,13 @@ class Agent:
                 self.console.print("─" * 30, style="bright_blue")
                 self.console.print()
                 break
+            except langgraph.errors.GraphRecursionError as e:
+                self.console.print()
+                self.console.print("─" * 40, style="bold blue")
+                self.console.print("📢  [bold blue]Agent has been going for a while[/bold blue]")
+                self.console.print("Would you like to continue or do you wish to refine your prompt instead? (y/n)", style="blue")
+                self.console.print("─" * 40, style="bold blue")
+                ######## placeholder for continuing logic
             except Exception as e:
                 self.console.print()
                 self.console.print("⚠️  [red]Error Occurred[/red]")
