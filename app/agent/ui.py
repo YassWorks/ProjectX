@@ -170,10 +170,10 @@ class AgentUI:
     def error(self, error_msg: str):
         """Display error message."""
         self.status_message(
-            "❌",
-            "⚠️ Error Occurred",
-            f"Error: {error_msg}\n[dim]Please try again...",
-            "red",
+            title="⚠️ Error Occurred",
+            message=f"Error: {error_msg}\n[dim]Please try again...",
+            emoji="❌",
+            style="red",
         )
 
     def dev_traceback(self):

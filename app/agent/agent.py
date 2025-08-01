@@ -1,13 +1,13 @@
-from app.agent.config.config import get_agent
 from langchain_core.messages import AIMessage
+from app.agent.config.config import get_agent
 from app.utils.ascii_art import ASCII_ART
-from app.agent.ui import AgentUI
 from rich.console import Console
+from app.agent.ui import AgentUI
 from rich.prompt import Prompt
 import langgraph
+import openai
 import uuid
 import os
-import openai
 
 
 class Agent:
@@ -32,11 +32,24 @@ class Agent:
             "recursion_limit": recursion_limit,
         }
 
+        continue_flag = False
+
         while True:
             try:
-                user_input = Prompt.ask(
-                    "\n[bold blue]You[/bold blue]", console=self.console
-                ).strip()
+
+                if continue_flag:
+                    user_input = (
+                        "Continue where you left. Don't repeat anything already done."
+                    )
+                    self.console.print(
+                        f"\n[bold blue]You[/bold blue]: {user_input}",
+                        style="blue",
+                    )
+                    continue_flag = False
+                else:
+                    user_input = Prompt.ask(
+                        "\n[bold blue]You[/bold blue]", console=self.console
+                    ).strip()
 
                 if user_input.lower() in ["/quit", "/exit", "/q"]:
                     self.ui.goodbye()
@@ -55,44 +68,44 @@ class Agent:
                 if user_input.lower() in ["/help", "/h"]:
                     self.ui.help(self.model_name)
                     continue
-                
-                if len(user_input.lower()) > 0 and user_input.lower()[0] == "/":
-                    self.ui.error("Unknown command. Type /help for instructions.")
-                    continue
-
-                if user_input.lower() == "/model":
-                    self.ui.status_message(
-                        title="Current Model",
-                        message=self.model_name,
-                    )
-                    continue
 
                 if not user_input:
                     continue
 
-                command_parts = user_input.lower().split()
-                
+                command_parts = user_input.lower().split(" ")
+
                 if command_parts[0] == "/model":
-                    if len(command_parts) > 1 and command_parts[1] == "change":
-                        if len(command_parts) > 2:
-                            new_model = command_parts[2]
-                            self.ui.status_message(
-                                title="Change Model",
-                                message=f"Changing model to {new_model}",
-                            )
-                            self.model_name = new_model
-                            self.agent = get_agent(
-                                model_name=self.model_name,
-                                api_key=self.api_key,
-                                system_prompt=self.system_prompt,
-                            )
-                            continue
-                        else:
+                    if len(command_parts) == 1:
+                        self.ui.status_message(
+                            title="Current Model",
+                            message=self.model_name,
+                        )
+                        continue
+
+                    if command_parts[1] == "change":
+                        if len(command_parts) < 3:
                             self.ui.error("Please specify a model to change to.")
                             continue
-                    else:
-                        self.ui.error("Unknown command. Type /help for instructions.")
+
+                        new_model = command_parts[2]
+                        self.ui.status_message(
+                            title="Change Model",
+                            message=f"Changing model to {new_model}",
+                        )
+                        self.model_name = new_model
+                        self.agent = get_agent(
+                            model_name=self.model_name,
+                            api_key=self.api_key,
+                            system_prompt=self.system_prompt,
+                        )
                         continue
+
+                    self.ui.error("Unknown model command. Type /help for instructions.")
+                    continue
+
+                if len(user_input.lower()) > 0 and user_input.lower()[0] == "/":
+                    self.ui.error("Unknown command. Type /help for instructions.")
+                    continue
 
                 self.ui.simulate_thinking()
 
@@ -131,7 +144,7 @@ class Agent:
                 break
             except langgraph.errors.GraphRecursionError as e:
                 self.ui.recursion_warning()
-                ######## placeholder for continuing logic
+                continue_flag = True
             except openai.RateLimitError:
                 self.ui.status_message(
                     "⏳",
